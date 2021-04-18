@@ -7,6 +7,7 @@ import { gsap } from 'gsap'
 /**
  * Loaders
  */
+let sceneReady = false
 const loadingBarElement = document.querySelector('.loading-bar')
 const loadingManager = new THREE.LoadingManager(
     // Loaded
@@ -22,6 +23,10 @@ const loadingManager = new THREE.LoadingManager(
             loadingBarElement.classList.add('ended')
             loadingBarElement.style.transform = ''
         }, 500)
+
+        window.setTimeout(() => {
+            sceneReady = true
+        }, 2000)
     },
 
     // Progress
@@ -128,6 +133,27 @@ gltfLoader.load(
     }
 )
 
+// Initialise the Raycaster
+const raycaster = new THREE.Raycaster()
+
+//  Points of Interest
+const points = [
+    {
+        position: new THREE.Vector3(1.55, 0.3, - 0.6),
+        element: document.querySelector('.point-0')
+    },
+    {
+        position: new THREE.Vector3(-2.6, -0.3, - 0.7),
+        element: document.querySelector('.point-1')
+    },
+    {
+        position: new THREE.Vector3(0.5, 0.8, - 1.6),
+        element: document.querySelector('.point-2')
+    }
+]
+
+// console.log(points)
+
 /**
  * Lights
  */
@@ -156,6 +182,7 @@ window.addEventListener('resize', () =>
     // Update camera
     camera.aspect = sizes.width / sizes.height
     camera.updateProjectionMatrix()
+    
 
     // Update renderer
     renderer.setSize(sizes.width, sizes.height)
@@ -198,9 +225,41 @@ const tick = () =>
     // Update controls
     controls.update()
 
+    if(sceneReady) {
+        // Go through each point
+        for(const point of points) {
+            // console.log(point)
+            const screenPosition = point.position.clone()
+            screenPosition.project(camera)
+            // console.log(screenPosition.x)
+
+            raycaster.setFromCamera(screenPosition, camera) // Aim the rays at the points in the scene
+            const intersects = raycaster.intersectObjects(scene.children, true) // Shoot the raycaster at every object in the scene
+            // console.log(intersects)
+
+            if(intersects.length === 0) {
+                point.element.classList.add('visible')
+            } else {
+                const intersectionDistance = intersects[0].distance
+                // console.log(intersectionDistance) The ray will be shorter when we're zoomed in and longer when far
+                const pointDistance = point.position.distanceTo(camera.position)
+                //console.log(pointDistance)
+
+                if(intersectionDistance < pointDistance) {
+                    point.element.classList.remove('visible')
+                } else {
+                    point.element.classList.add('visible')
+                }
+            }
+            const translateX = screenPosition.x * sizes.width * 0.5
+            const translateY = -screenPosition.y * sizes.height * 0.5 // have to invert bc of nature of camera
+
+            point.element.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`
+            // console.log(translateX)
+        }
+    }
     // Render
     renderer.render(scene, camera)
-
     // Call tick again on the next frame
     window.requestAnimationFrame(tick)
 }
